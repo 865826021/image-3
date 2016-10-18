@@ -32,6 +32,12 @@ class GD implements \wf\image\IImage {
 	 * @var string
 	 */
 	protected $imageContent = '';
+	
+	/**
+	 * 缩略图背景颜色
+	 * @var array
+	 */
+	protected $bgColor = [255, 255, 255];
 		
 	/**
 	 * 构造函数中设置内存限制多一点以能处理较大图片
@@ -39,9 +45,9 @@ class GD implements \wf\image\IImage {
 	 */
 	public function __construct() {
 		if (!function_exists('gd_info')) {
-			throw new Exception('你的php没有使用gd2扩展,不能处理图片');
+			throw new Exception('你的php没有使用gd2扩展，不能处理图片');
 		}
-		@ini_set("memory_limit", "128M");  // 处理大图片的时候要较很大的内存
+		@ini_set("memory_limit", "512M");  // 处理大图片的时候要较较大的内存
 	}
 	
 	/**
@@ -59,17 +65,26 @@ class GD implements \wf\image\IImage {
 		
 		return $this;
 	}
+
+	/**
+	 * 
+	 * {@inheritDoc}
+	 * @see \wf\image\IImage::setThumbBgColor()
+	 */
+	public function setBgColor($r, $g, $b) {
+		$this->bgColor = [$r, $g, $b];
+	}
 	
 	/**
 	 * 
 	 * {@inheritDoc}
 	 * @see \wf\image\IImage::thumb()
 	 */
-	public function thumb($thumbWidth, $thumbHeight, $thumbPath, $isCut = true) {
+	public function thumb($thumbWidth, $thumbHeight, $isCut = true, $cutPlace = 5, $quality = 95) {
 		if($isCut) {
-			return $this->thumbCutOut($thumbWidth, $thumbHeight, $thumbPath);
+			return $this->thumbCutOut($thumbWidth, $thumbHeight, $cutPlace, $quality);
 		} else {
-			return $this->thumbUnCut($thumbWidth, $thumbHeight, $thumbPath);
+			return $this->thumbUnCut($thumbWidth, $thumbHeight, $quality);
 		}
 	}
 	
@@ -77,11 +92,10 @@ class GD implements \wf\image\IImage {
 	 * 不裁剪方式生成缩略图
 	 * @param int $thumbWidth
 	 * @param int $thumbHeight
-	 * @param string $thumbPath
 	 * @return bool | string
 	 * @throws \wf\image\Exception
 	 */
-	private function thumbUnCut($thumbWidth, $thumbHeight, $thumbPath) {
+	private function thumbUnCut($thumbWidth, $thumbHeight, $quality) {
 		list($srcW, $srcH) = $this->imgInfo;
 		
 		// 宽或高按比例缩放
@@ -114,7 +128,7 @@ class GD implements \wf\image\IImage {
 		$thumbImage = imagecreate($thumbWidth, $thumbHeight);
 		
 		// 填充背景色
-		$fillColor = imagecolorallocate($thumbImage, 0xff, 0xff, 0xff);
+		$fillColor = imagecolorallocate($thumbImage, $this->bgColor[0], $this->bgColor[1], $this->bgColor[2]);
 		imagefill($thumbImage, 0, 0, $fillColor);
 
 		// 合上图
@@ -123,7 +137,7 @@ class GD implements \wf\image\IImage {
 		
 		// 为兼容云存贮设备，不直接把缩略图写入文件系统，而是返回文件内容
 		ob_start();
-		imagejpeg($thumbImage, null, 95);
+		imagejpeg($thumbImage, null, $quality);
 		$thumb = ob_get_clean();
 
 		imagedestroy($attachImage);
@@ -133,64 +147,69 @@ class GD implements \wf\image\IImage {
 			throw new Exception('无法生成缩略图');
 		}
 		
-		if (!$thumbPath) {
-			return $thumb;
-		}
-			
-		if (!is_dir(dirname($thumbPath))) {
-			@mkdir(dirname($thumbPath), 0755, true);
-		}
-			
-		return file_put_contents($thumbPath, $thumb);
+		return $thumb;
 	}
 	
 	/**
 	 * 裁剪方式生成缩略图
 	 * @param int $thumbWidth
 	 * @param int $thumbHeight
-	 * @param string $thumbPath
+	 * @param int $cutPlace = 5 1：x左y上, 2：x中y上， 3：x右y上, 4：x左y中， 5：x中y中， 6：x右y中，7：x左y下， 8：x中y下，9：x右y下 
 	 * @return bool | string
 	 * @throws \wf\image\Exception
 	 */
-	private function thumbCutOut($thumbWidth, $thumbHeight, $thumbPath) {
+	private function thumbCutOut($thumbWidth, $thumbHeight, $cutPlace = 5, $quality = 95) {
 		list($srcW, $srcH) = $this->imgInfo;
-		$imgH = $srcH;
-		$imgW = $srcW;
+		
+		$imgH = $srcH;  // 取样图片高
+		$imgW = $srcW;  // 取样图片宽
+		$srcX = 0; // 取样图片x坐标开始值
+		$srcY = 0; // 取样图片y坐标开始值
 		
 		$attachImage = imagecreatefromstring($this->imageContent);
-			
-		$thumbWidth > 0 || $thumbWidth = $srcW * ($thumbHeight/$srcH);
-		$xRatio = $thumbWidth / $imgW;  // 宽比率
-		$thumbHeight || $thumbHeight = $imgH*$xRatio;
-			
-		if ($imgW >= $thumbWidth || $imgH >= $thumbHeight ||
-		  ($srcW < $thumbWidth || $srcH < $thumbHeight && ($thumbWidth && $thumbHeight))) {
+						
+		if ($thumbWidth == 0 || $thumbHeight == 0) {
+			// 等比例缩放
+			$thumbWidth > 0 || $thumbWidth = $srcW * ($thumbHeight / $srcH);
+			$thumbHeight > 0 || $thumbHeight = $srcW * ($thumbWidth / $imgW);			
+		} else {
+			// 需要裁剪
+		  	
 			// 高需要截掉
-			if(($xRatio * $imgH) > $thumbHeight) {
+			if((($thumbWidth / $imgW) * $imgH) > $thumbHeight) {
 				$imgH = ($imgW / $thumbWidth) * $thumbHeight;
+				// 高开始截取位置
+				if (in_array($cutPlace, [4, 5, 6])) {
+					$srcY = ($srcH - $imgH)/2;
+				} elseif (in_array($cutPlace, [7, 8, 9])) {
+					$srcY = $srcH - $imgH;
+				}
 			} else {
 				// 宽需要截掉
 				$imgW = ($imgH / $thumbHeight) * $thumbWidth;
+				if (in_array($cutPlace, [2, 5, 8])) {
+					$srcX = ($srcW - $imgW)/2;
+				} elseif (in_array($cutPlace, [3, 6, 9])) {
+					$srcX = $srcW - $imgW;
+				}
 			}
 		}
-				
+		
 		// 缩略图一律用jpg格式文件，如果不设置缩略图保存路径则保存到原始文件所在目录
 		$thumbImage = imagecreatetruecolor($thumbWidth, $thumbHeight);
 		if($this->imgInfo['mime'] == 'image/gif') {
-			imagecolortransparent($attachImage, imagecolorallocate($attachImage, 255, 255, 255));
+			imagecolortransparent($attachImage, imagecolorallocate($attachImage, $this->bgColor[0], $this->bgColor[1], $this->bgColor[2]));
 		} else if($this->imgInfo['mime'] == 'image/png') {
 			imagealphablending($thumbImage , false);//关闭混合模式，以便透明颜色能覆盖原画布
 			imagesavealpha($thumbImage, true);
 		}
 	    
 		// 重采样拷贝部分图像并调整大小到$thumbImage
-		$srcX = floor(($srcW - $imgW)/2);
-		$srcY = floor(($srcH - $imgH)/2);
 		imagecopyresampled($thumbImage, $attachImage ,0, 0, $srcX, $srcY, $thumbWidth, $thumbHeight, $imgW, $imgH);
 		
 		// 为兼容云存贮设备，这里不直接把缩略图写入文件系统
 		ob_start();
-		imagejpeg($thumbImage, null, 95);
+		imagejpeg($thumbImage, null, $quality);
 		$thumb = ob_get_clean();
 
 		imagedestroy($attachImage);
@@ -199,16 +218,8 @@ class GD implements \wf\image\IImage {
 		if(!$thumb) {
 			throw new Exception('无法生成缩略图');
 		}
-
-		if (!$thumbPath) {
-			return $thumb;
-		}
 		
-		if (!is_dir(dirname($thumbPath))) {
-			@mkdir(dirname($thumbPath), 0755, true);
-		}
-			
-		return file_put_contents($thumbPath, $thumb);
+		return $thumb;
 	}
 
 	/**
@@ -216,7 +227,7 @@ class GD implements \wf\image\IImage {
 	 * {@inheritDoc}
 	 * @see \wf\image\IImage::watermark()
 	 */
-	public function watermark($watermarkFile = 'static/images/watermark.png', $distFile = null, $watermarkPlace = 9, $watermarkQuality = 85) {
+	public function watermark($watermarkFile = 'static/images/watermark.png', $watermarkPlace = 9, $quality = 95) {
 		@list($imgW, $imgH) = $this->imgInfo;
 		
 		$watermarkInfo	= @getimagesize($watermarkFile);
@@ -271,19 +282,15 @@ class GD implements \wf\image\IImage {
 			}
 
 			$dstImage = imagecreatetruecolor($imgW, $imgH);
-			imagefill($dstImage, 0, 0, imagecolorallocate($dstImage, 0xFF, 0xFF, 0xFF));			
+			imagefill($dstImage, 0, 0, imagecolorallocate($dstImage, $this->bgColor[0], $this->bgColor[1], $this->bgColor[2]));			
 			$targetImage = @imagecreatefromstring($this->imageContent);
 			
 			imageCopy($dstImage, $targetImage, 0, 0, 0, 0, $imgW, $imgH);
 			imageCopy($dstImage, $watermarkLogo, $x, $y, 0, 0, $logoW, $logoH);
 
-			if ($distFile) {
-				$ret = imagejpeg($dstImage, $distFile, $watermarkQuality);
-			} else {
-				ob_start();
-				imagejpeg($dstImage, null, $watermarkQuality);
-				$ret = ob_get_clean();
-			}
+			ob_start();
+			imagejpeg($dstImage, null, $quality);
+			$ret = ob_get_clean();
 
 			return $ret;
 		}
