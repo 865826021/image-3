@@ -2,10 +2,10 @@
 PHP_SAPI == 'cli' || die('access denied');
 $start = microtime(1);
 
-require_once '../IImage.php';
-require_once '../Exception.php';
-require_once '../adapter/GD.php';
-require_once '../ImageFactory.php';
+require_once '../lib/IImage.php';
+require_once '../lib/Exception.php';
+require_once '../lib/adapter/GD.php';
+require_once '../lib/ImageFactory.php';
 
 /**
  * 
@@ -32,7 +32,9 @@ $img = \wf\image\ImageFactory::create();
 $img->setImage(file_get_contents('src_image/1.png'));
 
 testThumb($img, 0,   200, 'dist_image/thumb.png.cut_0x200.jpg', true);
+testThumb($img, 0,   400, 'dist_image/thumb.png.cut_0x400.jpg', true);
 testThumb($img, 300, 0,   'dist_image/thumb.png.cut_300x0.jpg', true);
+testThumb($img, 600, 0,   'dist_image/thumb.png.cut_600x0.jpg', true);
 testThumb($img, 500, 300, 'dist_image/thumb.png.cut_500x300.jpg', true);
 
 testThumb($img, 500, 500, 'dist_image/thumb.png.cut_500x500-1.jpg', true, 1);
@@ -92,4 +94,4 @@ testWatermark($img, 'dist_image/water.gif.jpg');
 $end = microtime(1);
 $time = $end - $start;
 
-print "测试完成，用时{$time}毫秒";
+print "测试完成\n，用时{$time}毫秒";

@@ -168,16 +168,18 @@ class GD implements \wf\image\IImage {
 		
 		$attachImage = imagecreatefromstring($this->imageContent);
 						
-		if ($thumbWidth == 0 || $thumbHeight == 0) {
-			// 等比例缩放
-			$thumbWidth > 0 || $thumbWidth = $srcW * ($thumbHeight / $srcH);
-			$thumbHeight > 0 || $thumbHeight = $srcW * ($thumbWidth / $imgW);			
+		if($thumbWidth == 0){
+			// 宽等比例缩放
+			$thumbWidth = $srcW * ($thumbHeight / $srcH);
+		} elseif ($thumbHeight == 0) {
+			// 高等比例缩放
+			$thumbHeight = $srcH * ($thumbWidth / $srcW);			
 		} else {
-			// 需要裁剪
-		  	
-			// 高需要截掉
+			// 需要裁剪		  	
 			if((($thumbWidth / $imgW) * $imgH) > $thumbHeight) {
+			    // 高需要截掉
 				$imgH = ($imgW / $thumbWidth) * $thumbHeight;
+				
 				// 高开始截取位置
 				if (in_array($cutPlace, [4, 5, 6])) {
 					$srcY = ($srcH - $imgH)/2;
@@ -187,6 +189,7 @@ class GD implements \wf\image\IImage {
 			} else {
 				// 宽需要截掉
 				$imgW = ($imgH / $thumbHeight) * $thumbWidth;
+				
 				if (in_array($cutPlace, [2, 5, 8])) {
 					$srcX = ($srcW - $imgW)/2;
 				} elseif (in_array($cutPlace, [3, 6, 9])) {

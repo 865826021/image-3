@@ -1,17 +1,18 @@
 {
   "name" : "windwork/image",
   "description" : "windwork image component, implement thumb and watermark function. windwork图片处理组件，生支持成缩略图和打水印功能。",
-  "version" : "0.2.0",
+  "type" : "library",
+  "keywords": ["watermark","thumb","image"],
+  "version" : "0.2.1",
   "require" : {
     "php" : ">=5.5.0"
   },
   "license" : "MIT",
   "autoload" : {
     "psr-4" : {
-      "wf\\image\\" : "."
+      "wf\\image\\" : "lib"
     }
   },
-  "type" : "library",
   "authors" : [ {
     "name" : "Windwork Community",
     "homepage" : "http://windwork.org"
