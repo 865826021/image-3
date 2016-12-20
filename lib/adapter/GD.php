@@ -4,7 +4,7 @@
  * 
  * 一个开源的PHP轻量级高效Web开发框架
  * 
- * @copyright   Copyright (c) 2008-2015 Windwork Team. (http://www.windwork.org)
+ * @copyright   Copyright (c) 2008-2016 Windwork Team. (http://www.windwork.org)
  * @license     http://opensource.org/licenses/MIT	MIT License
  */
 namespace wf\image\adapter;
@@ -297,5 +297,18 @@ class GD implements \wf\image\IImage {
 
 			return $ret;
 		}
+	}
+
+
+	/**
+	 * 获取GD库版本
+	 */
+	public function getExtVersion() {
+		if(!function_exists('gd_info')) {
+			return false;
+		}
+		
+		$gdInfo = gd_info();
+		return 'GD ' . $gdInfo['GD Version'];
 	}
 }
